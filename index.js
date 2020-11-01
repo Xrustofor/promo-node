@@ -4,6 +4,7 @@ const sequelize = require('./utils/database');
 const apiRoutersCreate = require('./routes/createPromo');
 const apiRoutersEdit = require('./routes/editPromo');
 const apiRoutersAll = require('./routes/getAllPromo');
+const apiRoutersDelete = require('./routes/deletePromo');
 const Routers = require('./routes/index')
 const cors = require('cors')
 
@@ -21,6 +22,7 @@ app.use(express.json({ limit: "5mb" }));
 app.use('/api', cors(), apiRoutersCreate);
 app.use('/api', cors(), apiRoutersEdit);
 app.use('/api', cors(), apiRoutersAll);
+app.use('/api', cors(), apiRoutersDelete);
 app.use('/', cors(), Routers);
 
 

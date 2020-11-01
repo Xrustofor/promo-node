@@ -9,6 +9,7 @@ async function getAllNameImg(imgsId){
   if(imgsId.length != 0){
     for(let i = 0; i < imgsId.length; i++){
       const data = await Image.findByPk(imgsId[i]);
+      console.log(data);
       images.push({
         id: data.dataValues.id,
         url: data.dataValues.url,

@@ -1,5 +1,11 @@
 const fs = require('fs');
 const path = require('path');
+const { 
+  setDataImages,
+  Validation,
+  AdaptationForEdit,
+  getRemoveImgId
+} = require('./scripts')
 const { Router } = require('express')
 const router = Router();
 
@@ -25,66 +31,63 @@ async function getAllNameImg(imgsId){
   }
 }
 
-async function setAddImages(items) {
-  const imgsId = [];
+async function setCreateMainImages_db(item){
+  const data = await Image.create({
+    title: item.title,
+    url:  `upload/${item.fileName}`
+  })
+  return data.dataValues.id;
+}
 
+async function setCreateImages_db(items){
+
+  const imgsId = [];
   for(let i = 0; i < items.length; i++){
     const data = await Image.create({
-      title: items[i].title,
-      url:  `upload/${items[i].nameFile}`
+      url:  `upload/${items[i].fileName}`
     });
     imgsId.push(data.id);
   }
   return imgsId;
-};
-
-function compareImgId(imagesId, dateRemove){
-  console.log(imagesId)
-  console.log(dateRemove)
-  let idx = 0;
-  const data = [];
-
-  for(let i = 0; i < dateRemove.length; i++){
-    if(dateRemove[i].remove){
-      data.push(imagesId[idx++])
-    } if (dateRemove[i].remove == false) {
-      data.push(dateRemove[i].id);
-    }
-  }
-
-  console.log(data);
-  return data;
-
 }
 
-async function removeImages(items){
+async function updateImagesTitles_db(items){
+  if(items){
+    for(let i = 0; i < items.length; i++){
+      try{
+        const images = await Image.findByPk(items[i].id);
 
+        images.title = items[i].title;
+        images.save();
+
+      } catch(e){
+        console.log(e);
+      }
+    }
+  }
+}
+
+async function setRemoveImages_db(items){
+  
   const imageRemove = [];
 
   for(let i = 0; i < items.length; i++){
-    if(items[i].remove){
-      let id = items[i].id
-      try{
-        let item = await Image.findByPk(id);
+    try{
+      const item = await Image.findByPk(items[i]);
 
-        const imgId = item.dataValues.id;
-        
-        const imageData = item.dataValues.url.split('/');
-        const folder = imageData[0];
-        const fileName = imageData[1];
+      const imageData = item.dataValues.url.split('/');
+      const folder = imageData[0];
+      const fileName = imageData[1];
 
-        await fs.unlink(path.join(folder, fileName), async (err) => {
+      await item.destroy();
 
-          if(err) throw err;
-
-          await item.destroy();
-
-          imageRemove.push(imgId)
-
-          console.log('File deleted!');
-
-        })
-      } catch(e) { console.log(e) }
+      await fs.unlink(path.join(folder, fileName), async (err) => {
+        if(err) throw err;
+        console.log('File deleted!');
+      })
+      
+    } catch(e){
+      console.log(e);
     }
   }
   return imageRemove;
@@ -118,99 +121,78 @@ router.put(
   upload,
   async (req, res, next) => {
     const id = +req.params.id;
-    const data = req.body;
-    const dateRemove = JSON.parse(data.removeImages);
 
-    const errorData = {
-      title: { message: "Не заповненний заголовок." },
-      description: {
-        messageValue: "Не заповненний опис продукту.",
-        messageLength: "Опис не має перевищувати 1000 символів."
-      },
-      price: { message: "Не вказана ціна." },
-      image: { message: "Відсутнє головне зображеня." }
-    };
+    let data = AdaptationForEdit(req.body);
 
-    let errorMessage = [];
+    const imagesUpload = setDataImages(req.files);
+    data.imagesUpload = imagesUpload;
 
-    for(key in data){
-      switch(key) {
-        case 'title' : 
-          if(!data[key].length){
-            errorMessage.push(errorData.title.message)
-          }
-          break;
-        case 'description' : 
-          if(!data[key].length){
-            errorMessage.push(errorData.description.messageValue)
-          }
-          if(data[key].length > 1000){
-            errorMessage.push(errorData.description.messageLength)
-          }
-          break;
-        case 'price' :
-          if(data[key] == 'null' || data[key].trim() == ''){
-            errorMessage.push(errorData.price.message)
-          }
-          break;
-      }
-    }
-
-    if(!req.files.length && dateRemove[0].remove){
-      errorMessage.push(errorData.image.message);
-    }
-
+    const errorMessage = Validation(data);
 
     if(!errorMessage.length){
-      const dataImages = [];
-      let imagesId = null;
-      
-      if(req.files.length !== 0){
+      try{
 
-        const imagesNames = req.files.map(d => d.filename);
-        const imagesTitle =  JSON.parse(data.imagesTitles);
+        const promo = await Advert.findByPk(id);
 
-        imagesTitle.forEach((n, idx) => {
-          dataImages.push({
-            title: n,
-            nameFile: imagesNames[idx]
+        let imagesId_db = JSON.parse(promo.dataValues.imagesId) 
+          ? JSON.parse(promo.dataValues.imagesId)
+          : [];
+
+        let removeImages = getRemoveImgId(data);
+        
+        await setRemoveImages_db(removeImages);
+
+        for(let i = 0; i < removeImages.length; i++){
+          const idx = imagesId_db.indexOf(removeImages[i]);
+          imagesId_db.splice(idx, 1);
+        }
+
+        if(data.removeImages[0].select && imagesUpload.length === 1){
+          const item = {
+            title: data.imagesTitles[0],
+            fileName: data.imagesUpload[0]
+          }
+          const idMainImage = await setCreateMainImages_db(item);
+          imagesId_db.unshift(idMainImage);
+        } 
+        
+        else {
+          const updataImages = [];
+          for(let i = 0; i < imagesUpload.length; i++){
+            updataImages.push({
+              fileName: imagesUpload[i],
+            })
+          }
+          const imagesId = await setCreateImages_db(updataImages);
+          for(let i = 0; i < imagesId.length; i++){
+            imagesId_db.push(imagesId[i])
+          }
+
+        }
+       
+        const updateImagesTitles = [];
+        for(let i = 0; i < imagesId_db.length; i++){
+          updateImagesTitles.push({
+            id: imagesId_db[i],
+            title: data.imagesTitles[i]
           })
-        });
+        }
+        await updateImagesTitles_db(updateImagesTitles);
 
-        imagesId = await setAddImages(dataImages); // збереження зображення на сервері
-
-        arrayId = compareImgId(imagesId, dateRemove);
-
-        console.log('compareId-' + arrayId);
-
-        // let promo = await Advert.findByPk(id)
-        // promo.imagesId = JSON.stringify(imagesId);
-        // await promo.save();
-
-        // console.log(promo);
-
-        // items = await Advert.create({
-        //   title: data.title,
-        //   description: data.description,
-        //   price: data.price,
-        //   imagesId: imagesId
-        // })
-      }
-      res.status(201).json();
+        promo.imagesId = JSON.stringify(imagesId_db);
+        promo.title = data.title;
+        promo.description = data.description;
+        promo.price = data.price;
+        await promo.save();
+ 
+      }catch(e){ console.log(e) }
     } else {
       res.status(412).json(errorMessage);
-      errorMessage = [];
     }
 
-
-
-    
-    // let imagesRemove = [];
-    // if(dateRemove){
-    //   imagesRemove = await removeImages(dateRemove);
-    // }
-    // console.log(imagesRemove);
+     res.status(201).json();
   }
+  
 )
 
 module.exports = router;
