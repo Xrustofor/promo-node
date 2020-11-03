@@ -1,6 +1,5 @@
 const {Router} = require('express')
 const router = Router();
-
 const Advert = require("../models/advert");
 const Image = require("../models/image");
 
@@ -23,28 +22,75 @@ async function getAllNameImg(imgsId){
 }
 
 router.get('/', async (req, res) => {
-  //const pageId = req.params.id;
-  console.log('getAll');
-  try{
-    const items = await Advert.findAll();
-    const data = [];
-  
-    for(let i = 0; i < items.length; i++){
-      data[i] = items[i].dataValues
-  
-      if(items[i].dataValues.imagesId){
-        const imgsId = JSON.parse(items[i].dataValues.imagesId);
-        const images = await getAllNameImg(imgsId);
-        data[i].images = images ? images : [];
-        delete data[i].imagesId
-      }
+  let query = {};
+  let result = [];
+  let totalItems = {};
+
+  if(Object.keys(req.query).length){
+
+    let currentPages = req.query.currentPage ? req.query.currentPage : 1;
+    const countPromoOnPage = req.query.countPromoOnPage ? req.query.countPromoOnPage : 2;
+    const sort = req.query.sort ? req.query.sort : 'data';
+
+    let countPromoAll = null;
+    try{
+      countPromoAll = await Advert.count();
+    } catch(e) { console.log(e) } 
+
+    let offset = 0;
+
+    const countPages = +Math.ceil(countPromoAll / countPromoOnPage);
+    if(currentPages > countPages){
+      offset = 0;
+      currentPages = 1;
     }
-    res.status(200).json(data);
-  } catch(e){
-    res.status(500).json();
-    console.log(e)
+    offset = countPromoOnPage * currentPages - countPromoOnPage;
+
+    try {
+      let items = await Advert.findAll({
+        limit: +countPromoOnPage,
+        offset: offset
+      });
+
+      for(let i = 0; i < items.length; i++){
+
+        result[i] = items[i].dataValues;
+
+        if(items[i].imagesId){
+          const imgsId = JSON.parse(items[i].dataValues.imagesId);
+          let images = [];
+          try{
+            result[i].images = await getAllNameImg(imgsId);
+          } catch(e) { console.log(e) }
+        }   
+      }
+         
+      const totalItems = { countPages, currentPages, countPromoOnPage, sort,  result }
+      res.status(200).json(totalItems);
+
+    } catch(e) {
+      console.log(e)
+      res.status(404).json();
+    }
+
+  } else {
+
+    let items = await Advert.findAll();
+
+    for(let i = 0; i < items.length; i++){
+
+      result[i] = items[i].dataValues;
+
+      if(items[i].imagesId){
+        const imgsId = JSON.parse(items[i].dataValues.imagesId);
+        try{
+          result[i].images = await getAllNameImg(imgsId);
+        } catch(e) { console.log(e) }
+      }   
+    }
+
+    res.status(200).json({result});
   }
 })
-
 
 module.exports = router;

@@ -1,6 +1,6 @@
 const path = require('path');
 const fs = require('fs');
-const {Router} = require('express');
+const { Router } = require('express');
 const router = Router();
 const Advert = require("../models/advert");
 const Image = require("../models/image");
