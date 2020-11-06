@@ -8,7 +8,6 @@ async function getAllNameImg(imgsId){
   if(imgsId.length != 0){
     for(let i = 0; i < imgsId.length; i++){
       const data = await Image.findByPk(imgsId[i]);
-      console.log(data);
       images.push({
         id: data.dataValues.id,
         url: data.dataValues.url,
@@ -22,15 +21,21 @@ async function getAllNameImg(imgsId){
 }
 
 router.get('/', async (req, res) => {
-  let query = {};
   let result = [];
-  let totalItems = {};
-
+ 
   if(Object.keys(req.query).length){
 
     let currentPages = req.query.currentPage ? req.query.currentPage : 1;
     const countPromoOnPage = req.query.countPromoOnPage ? req.query.countPromoOnPage : 2;
     const sort = req.query.sort ? req.query.sort : 'data';
+
+    // switch(sort){
+    //   case 'date':
+    //     order = '"updatedAt" DESC'; break;
+    //   case '-date':
+    //     order = '"updatedAt" DESC'; break;
+    // }
+
 
     let countPromoAll = null;
     try{
@@ -46,10 +51,34 @@ router.get('/', async (req, res) => {
     }
     offset = countPromoOnPage * currentPages - countPromoOnPage;
 
+    let order = null;
+    switch(sort){
+      case 'date' :
+        order = [['updatedAt', 'ASC']];
+        break;
+      case '-date' :
+        order = [['updatedAt', 'DESC']];
+        break;
+      case 'price' :
+        order = [['price', 'ASC']];
+        break;
+      case '-price' : 
+        order = [['price', 'DESC']];
+        break;
+      case 'title' :
+        order = [['title', 'ASC']];
+        break;
+      case '-title' : 
+        order = [['title', 'DESC']];
+        break;
+      
+    }
+
     try {
       let items = await Advert.findAll({
         limit: +countPromoOnPage,
-        offset: offset
+        order: order,
+        offset: offset,
       });
 
       for(let i = 0; i < items.length; i++){
@@ -64,7 +93,6 @@ router.get('/', async (req, res) => {
           } catch(e) { console.log(e) }
         }   
       }
-         
       const totalItems = { countPages, currentPages, countPromoOnPage, sort,  result }
       res.status(200).json(totalItems);
 

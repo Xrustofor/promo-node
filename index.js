@@ -1,5 +1,6 @@
 const express = require('express');
 const sequelize = require('./utils/database');
+const path = require('path');
 
 const apiRoutersCreate = require('./routes/createPromo');
 const apiRoutersEdit = require('./routes/editPromo');
@@ -25,6 +26,14 @@ app.use('/api', cors(), apiRoutersAll);
 app.use('/api', cors(), apiRoutersDelete);
 app.use('/', cors(), Routers);
 
+app.use(express.static('public', {
+  extensions: ['htm', 'html'],
+  index: false,
+}));
+
+app.use((req, res, next) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+})
 
 async function start() {
   try {

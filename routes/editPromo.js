@@ -187,7 +187,11 @@ router.put(
  
       }catch(e){ console.log(e) }
     } else {
-      res.status(412).json(errorMessage);
+      const error = {
+        valid: false,
+        errorMessage
+      }
+      res.status(200).json(error);
     }
 
      res.status(201).json();

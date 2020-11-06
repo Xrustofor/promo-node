@@ -93,8 +93,11 @@ router.post(
       }
       res.status(201).json(items);
     } else {
-      res.status(412).json(errorMessage);
-      errorMessage = [];
+      const error = {
+        valid: false,
+        errorMessage
+      }
+      res.status(200).json(error);
     }
 })
 
